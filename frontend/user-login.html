@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>User Sign In — Loan Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <p class="brand">📒 Loan Manager</p>
+      <p class="sub">User sign in</p>
+
+      <form id="loginForm">
+        <label for="email">Email</label>
+        <input type="email" id="email" required placeholder="you@example.com" autocomplete="email">
+
+        <label for="password">Password</label>
+        <input type="password" id="password" required placeholder="••••••••" autocomplete="current-password">
+
+        <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+        <p class="error-msg" id="errorMsg"></p>
+      </form>
+
+      <p class="foot-link">Not a user? <a href="customer-login.html">Customer sign in</a></p>
+    </div>
+  </div>
+
+<script src="js/api.js"></script>
+<script src="js/user-login.js"></script>
+</body>
+</html>

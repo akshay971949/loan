@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Users — Loan Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <p class="brand">📒 Loan Manager</p>
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="customers.html">Customers</a>
+      <a href="loans.html">Loans</a>
+      <a href="users.html" class="active">Users</a>
+    </nav>
+    <div class="user-box">
+      <div class="who" id="whoName">—</div>
+      <div id="whoEmail" style="margin-bottom:12px"></div>
+      <a href="account.html" class="btn btn-ghost btn-sm" style="margin-bottom:6px;display:block">Change password</a>
+      <a href="#" class="btn btn-ghost btn-sm" id="logoutBtn">Log out</a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="main-header">
+      <div>
+        <h1>Users</h1>
+        <p>Staff accounts with full dashboard access</p>
+      </div>
+      <button class="btn btn-primary" id="addBtn">+ Add user</button>
+    </div>
+
+    <div class="panel">
+      <table>
+        <thead>
+          <tr><th>Name</th><th>Email</th><th>Phone</th><th>Added</th><th></th></tr>
+        </thead>
+        <tbody id="adminsBody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<div class="modal-overlay" id="adminModal">
+  <div class="modal">
+    <h3>Add user</h3>
+    <p class="sub">Grants full dashboard access</p>
+    <label for="a_name">Full name</label>
+    <input type="text" id="a_name">
+    <label for="a_email">Email</label>
+    <input type="email" id="a_email">
+    <label for="a_phone">Phone (optional)</label>
+    <input type="text" id="a_phone">
+    <label for="a_password">Password</label>
+    <input type="password" id="a_password" placeholder="At least 6 characters">
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="adminCancel">Cancel</button>
+      <button class="btn btn-primary" id="adminSave">Create user</button>
+    </div>
+    <p class="error-msg" id="adminError"></p>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/users.js"></script>
+</body>
+</html>

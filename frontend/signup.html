@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign Up — Loan Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <p class="brand">📒 Loan Manager</p>
+      <p class="sub">Create your customer account</p>
+
+      <form id="signupForm">
+        <label for="name">Full name</label>
+        <input type="text" id="name" required placeholder="Jane Doe">
+
+        <label for="phone">Phone</label>
+        <input type="text" id="phone" required placeholder="98765 43210">
+
+        <label for="email">Email</label>
+        <input type="email" id="email" required placeholder="you@example.com" autocomplete="email">
+
+        <label for="password">Password</label>
+        <input type="password" id="password" required minlength="6" placeholder="At least 6 characters" autocomplete="new-password">
+
+        <button type="submit" class="btn btn-primary btn-block">Create account</button>
+        <p class="error-msg" id="errorMsg"></p>
+      </form>
+
+      <p class="foot-link">Already have an account? <a href="customer-login.html">Sign in</a></p>
+    </div>
+  </div>
+
+<script src="js/api.js"></script>
+<script src="js/signup.js"></script>
+</body>
+</html>

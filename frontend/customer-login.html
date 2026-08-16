@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Customer Sign In — Loan Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <p class="brand">📒 Loan Manager</p>
+      <p class="sub">Customer sign in</p>
+
+      <form id="loginForm">
+        <label for="email">Email</label>
+        <input type="email" id="email" required placeholder="you@example.com" autocomplete="email">
+
+        <label for="password">Password</label>
+        <input type="password" id="password" required placeholder="••••••••" autocomplete="current-password">
+
+        <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+        <p class="error-msg" id="errorMsg"></p>
+      </form>
+
+      <p class="foot-link">Don't have an account? <a href="signup.html">Sign up</a></p>
+      <p class="foot-link" style="margin-top:6px">Are you a user? <a href="user-login.html">User sign in</a></p>
+    </div>
+  </div>
+
+<script src="js/api.js"></script>
+<script src="js/customer-login.js"></script>
+</body>
+</html>

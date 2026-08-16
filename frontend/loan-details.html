@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loan Details — Loan Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <p class="brand">📒 Loan Manager</p>
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="customers.html">Customers</a>
+      <a href="loans.html" class="active">Loans</a>
+      <a href="users.html">Users</a>
+    </nav>
+    <div class="user-box">
+      <div class="who" id="whoName">—</div>
+      <div id="whoEmail" style="margin-bottom:12px"></div>
+      <a href="account.html" class="btn btn-ghost btn-sm" style="margin-bottom:6px;display:block">Change password</a>
+      <a href="#" class="btn btn-ghost btn-sm" id="logoutBtn">Log out</a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="main-header">
+      <div>
+        <h1 id="loanTitle">Loan #—</h1>
+        <p id="loanSub">—</p>
+      </div>
+      <div class="toolbar">
+        <select id="statusSelect">
+          <option value="active">Active</option>
+          <option value="closed">Closed</option>
+          <option value="defaulted">Defaulted</option>
+        </select>
+        <button class="btn btn-ghost" id="exportBtn">Export schedule (CSV)</button>
+      </div>
+    </div>
+
+    <div class="stats-grid" id="loanStats"></div>
+    <!-- interest rate shown in loanStats is now displayed as monthly (see loan-details.js) -->
+
+    <div class="panel">
+      <div class="panel-head"><h3>EMI schedule</h3></div>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Due date</th><th class="right">Principal</th><th class="right">Interest</th><th class="right">EMI</th><th>Status</th><th>Paid on</th><th></th></tr>
+        </thead>
+        <tbody id="emiBody"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<div class="modal-overlay" id="payModal">
+  <div class="modal">
+    <h3>Record payment</h3>
+    <p class="sub" id="payModalSub"></p>
+    <label for="payAmount">Amount received</label>
+    <input type="number" id="payAmount" step="0.01">
+    <label for="payDate">Payment date</label>
+    <input type="date" id="payDate">
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="payCancel">Cancel</button>
+      <button class="btn btn-primary" id="payConfirm">Confirm payment</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/loan-details.js"></script>
+</body>
+</html>

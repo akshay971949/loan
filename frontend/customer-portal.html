@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Loans — Loan Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <p class="brand">📒 Loan Manager</p>
+    <nav>
+      <a href="customer-portal.html" class="active">My Loans</a>
+    </nav>
+    <div class="user-box">
+      <div class="who" id="whoName">—</div>
+      <div id="whoEmail" style="margin-bottom:12px"></div>
+      <a href="account.html" class="btn btn-ghost btn-sm" style="margin-bottom:6px;display:block">Change password</a>
+      <a href="#" class="btn btn-ghost btn-sm" id="logoutBtn">Log out</a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="main-header">
+      <div>
+        <h1>My Loans</h1>
+        <p>Track your EMIs and payment history</p>
+      </div>
+    </div>
+
+    <div id="loansContainer"></div>
+    <div class="empty-state" id="loansEmpty" style="display:none">
+      <div class="big">💳</div>
+      You don't have any loans yet. Contact us to get started.
+    </div>
+  </main>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/customer-portal.js"></script>
+</body>
+</html>

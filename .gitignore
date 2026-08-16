@@ -1,0 +1,9 @@
+# Never commit secrets
+backend/.env
+
+# Dependencies (installed fresh on the server via npm install)
+backend/node_modules/
+
+# OS/editor junk
+.DS_Store
+Thumbs.db

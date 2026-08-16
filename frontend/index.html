@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loan Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="auth-card" style="max-width:420px">
+      <p class="brand">📒 Loan Manager</p>
+      <p class="sub">Choose how you'd like to sign in</p>
+
+      <a href="user-login.html" class="btn btn-primary btn-block" style="margin-top:8px">User sign in</a>
+      <a href="customer-login.html" class="btn btn-ghost btn-block" style="margin-top:12px">Customer sign in</a>
+
+      <p class="foot-link" style="margin-top:26px">New customer? <a href="signup.html">Create an account</a></p>
+    </div>
+  </div>
+
+<script src="js/api.js"></script>
+<script>
+  // If already logged in, skip straight to the right dashboard
+  (function redirectIfLoggedIn() {
+    const user = getUser();
+    if (getToken() && user) {
+      window.location.href = user.role === 'admin' ? 'dashboard.html' : 'customer-portal.html';
+    }
+  })();
+</script>
+</body>
+</html>
