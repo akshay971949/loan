@@ -1,4 +1,4 @@
-const user = guardPage('admin');
+const user = guardPage(['admin', 'staff']);
 if (user) {
   document.getElementById('whoName').textContent = user.name;
   document.getElementById('whoEmail').textContent = user.email;
@@ -86,3 +86,9 @@ document.getElementById('exportDueBtn').addEventListener('click', () => {
 
 loadStats();
 loadDue();
+
+// "Staff" management is admin-only — hide the nav link for staff-role users
+if (user && user.role !== 'admin') {
+  const staffLink = document.getElementById('staffNavLink');
+  if (staffLink) staffLink.style.display = 'none';
+}

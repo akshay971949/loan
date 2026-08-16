@@ -4,7 +4,7 @@ const { authenticate, requireRole } = require('../middleware/auth');
 const { generateSchedule } = require('../utils/emi');
 const router = express.Router();
 
-// GET /api/loans - admin/user: only loans on customers THEY added, customer: only their own
+// GET /api/loans - admin: whole company. staff: only what THEY added. customer: only their own.
 router.get('/', authenticate, async (req, res) => {
   try {
     const { status } = req.query;
@@ -16,9 +16,12 @@ router.get('/', authenticate, async (req, res) => {
     if (req.user.role === 'customer') {
       where.push('customers.user_id = ?');
       params.push(req.user.id);
-    } else {
+    } else if (req.user.role === 'staff') {
       where.push('loans.created_by = ?');
       params.push(req.user.id);
+    } else if (req.user.role === 'admin') {
+      where.push('loans.company_id = ?');
+      params.push(req.user.company_id);
     }
     if (status) {
       where.push('loans.status = ?');
@@ -48,7 +51,10 @@ router.get('/:id', authenticate, async (req, res) => {
     if (req.user.role === 'customer' && loan.user_id !== req.user.id) {
       return res.status(403).json({ message: 'Access denied' });
     }
-    if (req.user.role === 'admin' && loan.created_by !== req.user.id) {
+    if (req.user.role === 'staff' && loan.created_by !== req.user.id) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+    if (req.user.role === 'admin' && loan.company_id !== req.user.company_id) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
@@ -59,8 +65,8 @@ router.get('/:id', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/loans - admin creates a loan; auto-generates the EMI schedule
-router.post('/', authenticate, requireRole('admin'), async (req, res) => {
+// POST /api/loans - admin/staff creates a loan; auto-generates the EMI schedule
+router.post('/', authenticate, requireRole('admin', 'staff'), async (req, res) => {
   const conn = await pool.getConnection();
   try {
     const { customer_id, loan_type, principal_amount, interest_rate, tenure_months, start_date } = req.body;
@@ -68,8 +74,12 @@ router.post('/', authenticate, requireRole('admin'), async (req, res) => {
       return res.status(400).json({ message: 'customer_id, principal_amount, interest_rate, tenure_months and start_date are required' });
     }
 
-    const [ownedCustomer] = await conn.query('SELECT id FROM customers WHERE id = ? AND created_by = ?', [customer_id, req.user.id]);
-    if (!ownedCustomer.length) {
+    // Verify the customer belongs to this user's company (and, for staff, that they created it)
+    const [custRows] = await conn.query('SELECT id, company_id, created_by FROM customers WHERE id = ?', [customer_id]);
+    if (!custRows.length || custRows[0].company_id !== req.user.company_id) {
+      return res.status(403).json({ message: 'You can only create loans for customers in your company' });
+    }
+    if (req.user.role === 'staff' && custRows[0].created_by !== req.user.id) {
       return res.status(403).json({ message: 'You can only create loans for customers you added' });
     }
 
@@ -80,9 +90,9 @@ router.post('/', authenticate, requireRole('admin'), async (req, res) => {
     await conn.beginTransaction();
 
     const [loanResult] = await conn.query(
-      `INSERT INTO loans (customer_id, loan_type, principal_amount, interest_rate, tenure_months, emi_amount, start_date, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [customer_id, loan_type || 'Personal', principal_amount, interest_rate, tenure_months, emi, start_date, req.user.id]
+      `INSERT INTO loans (company_id, customer_id, loan_type, principal_amount, interest_rate, tenure_months, emi_amount, start_date, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.user.company_id, customer_id, loan_type || 'Personal', principal_amount, interest_rate, tenure_months, emi, start_date, req.user.id]
     );
     const loanId = loanResult.insertId;
 
@@ -105,15 +115,18 @@ router.post('/', authenticate, requireRole('admin'), async (req, res) => {
 });
 
 // PUT /api/loans/:id/status - update loan status (active/closed/defaulted)
-router.put('/:id/status', authenticate, requireRole('admin'), async (req, res) => {
+router.put('/:id/status', authenticate, requireRole('admin', 'staff'), async (req, res) => {
   try {
     const { status } = req.body;
     if (!['active', 'closed', 'defaulted'].includes(status)) {
       return res.status(400).json({ message: 'Invalid status' });
     }
-    const [existing] = await pool.query('SELECT created_by FROM loans WHERE id = ?', [req.params.id]);
+    const [existing] = await pool.query('SELECT company_id, created_by FROM loans WHERE id = ?', [req.params.id]);
     if (!existing.length) return res.status(404).json({ message: 'Loan not found' });
-    if (existing[0].created_by !== req.user.id) return res.status(403).json({ message: 'Access denied' });
+    const loan = existing[0];
+
+    if (req.user.role === 'staff' && loan.created_by !== req.user.id) return res.status(403).json({ message: 'Access denied' });
+    if (req.user.role === 'admin' && loan.company_id !== req.user.company_id) return res.status(403).json({ message: 'Access denied' });
 
     await pool.query('UPDATE loans SET status = ? WHERE id = ?', [status, req.params.id]);
     res.json({ message: 'Loan status updated' });

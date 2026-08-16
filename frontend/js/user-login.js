@@ -1,3 +1,8 @@
+function redirectForRole(role) {
+  if (role === 'super_admin') return 'companies.html';
+  return 'dashboard.html'; // admin or staff
+}
+
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const errorMsg = document.getElementById('errorMsg');
@@ -7,9 +12,9 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
   const password = document.getElementById('password').value;
 
   try {
-    const data = await api('/auth/login', { method: 'POST', body: { email, password, portal: 'admin' }, auth: false });
+    const data = await api('/auth/login', { method: 'POST', body: { email, password, portal: 'staff' }, auth: false });
     setSession(data.token, data.user);
-    window.location.href = 'dashboard.html';
+    window.location.href = redirectForRole(data.user.role);
   } catch (err) {
     errorMsg.textContent = err.message;
     errorMsg.style.display = 'block';
@@ -18,7 +23,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
 
 (function redirectIfLoggedIn() {
   const user = getUser();
-  if (getToken() && user && user.role === 'admin') {
-    window.location.href = 'dashboard.html';
+  if (getToken() && user && ['super_admin', 'admin', 'staff'].includes(user.role)) {
+    window.location.href = redirectForRole(user.role);
   }
 })();

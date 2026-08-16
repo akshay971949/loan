@@ -13,13 +13,24 @@ function sendCsv(res, rows, filename) {
   res.send(csv);
 }
 
-// GET /api/export/customers - only what THIS admin/user added
-router.get('/customers', authenticate, requireRole('admin'), async (req, res) => {
+function customerScope(req) {
+  return req.user.role === 'admin'
+    ? { clause: 'customers.company_id = ?', param: req.user.company_id }
+    : { clause: 'customers.created_by = ?', param: req.user.id };
+}
+function loanScope(req) {
+  return req.user.role === 'admin'
+    ? { clause: 'loans.company_id = ?', param: req.user.company_id }
+    : { clause: 'loans.created_by = ?', param: req.user.id };
+}
+
+router.get('/customers', authenticate, requireRole('admin', 'staff'), async (req, res) => {
   try {
+    const scope = customerScope(req);
     const [rows] = await pool.query(
       `SELECT id, full_name, email, phone, address, id_proof_type, id_proof_number, occupation, monthly_income, created_at
-       FROM customers WHERE created_by = ? ORDER BY id`,
-      [req.user.id]
+       FROM customers WHERE ${scope.clause} ORDER BY id`,
+      [scope.param]
     );
     sendCsv(res, rows, `customers_${Date.now()}.csv`);
   } catch (err) {
@@ -27,15 +38,15 @@ router.get('/customers', authenticate, requireRole('admin'), async (req, res) =>
   }
 });
 
-// GET /api/export/loans - only what THIS admin/user created
-router.get('/loans', authenticate, requireRole('admin'), async (req, res) => {
+router.get('/loans', authenticate, requireRole('admin', 'staff'), async (req, res) => {
   try {
+    const scope = loanScope(req);
     const [rows] = await pool.query(
       `SELECT loans.id, customers.full_name, customers.phone, loans.loan_type, loans.principal_amount,
               loans.interest_rate, loans.tenure_months, loans.emi_amount, loans.start_date, loans.status
        FROM loans JOIN customers ON loans.customer_id = customers.id
-       WHERE loans.created_by = ? ORDER BY loans.id`,
-      [req.user.id]
+       WHERE ${scope.clause} ORDER BY loans.id`,
+      [scope.param]
     );
     sendCsv(res, rows, `loans_${Date.now()}.csv`);
   } catch (err) {
@@ -43,18 +54,18 @@ router.get('/loans', authenticate, requireRole('admin'), async (req, res) => {
   }
 });
 
-// GET /api/export/emis?loan_id=  (all of THIS admin/user's EMIs, or a single loan's schedule)
-router.get('/emis', authenticate, requireRole('admin'), async (req, res) => {
+router.get('/emis', authenticate, requireRole('admin', 'staff'), async (req, res) => {
   try {
     const { loan_id } = req.query;
+    const scope = loanScope(req);
     let sql = `SELECT emis.id, customers.full_name, loans.id AS loan_id, emis.emi_number, emis.due_date,
                       emis.emi_amount, emis.principal_component, emis.interest_component,
                       emis.paid_amount, emis.paid_date, emis.status
                FROM emis
                JOIN loans ON emis.loan_id = loans.id
                JOIN customers ON loans.customer_id = customers.id
-               WHERE loans.created_by = ?`;
-    const params = [req.user.id];
+               WHERE ${scope.clause}`;
+    const params = [scope.param];
     if (loan_id) {
       sql += ' AND loans.id = ?';
       params.push(loan_id);
@@ -67,18 +78,18 @@ router.get('/emis', authenticate, requireRole('admin'), async (req, res) => {
   }
 });
 
-// GET /api/export/due - THIS admin/user's currently due + overdue EMIs (collections list)
-router.get('/due', authenticate, requireRole('admin'), async (req, res) => {
+router.get('/due', authenticate, requireRole('admin', 'staff'), async (req, res) => {
   try {
+    const scope = loanScope(req);
     const [rows] = await pool.query(
       `SELECT emis.id, customers.full_name, customers.phone, loans.id AS loan_id, emis.emi_number,
               emis.due_date, emis.emi_amount, emis.status
        FROM emis
        JOIN loans ON emis.loan_id = loans.id
        JOIN customers ON loans.customer_id = customers.id
-       WHERE emis.status IN ('pending','overdue') AND loans.created_by = ?
+       WHERE emis.status IN ('pending','overdue') AND ${scope.clause}
        ORDER BY emis.due_date ASC`,
-      [req.user.id]
+      [scope.param]
     );
     sendCsv(res, rows, `due_emis_${Date.now()}.csv`);
   } catch (err) {

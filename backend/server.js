@@ -6,6 +6,8 @@ const cron = require('node-cron');
 const pool = require('./config/db');
 
 const authRoutes = require('./routes/auth');
+const companyRoutes = require('./routes/companies');
+const staffRoutes = require('./routes/staff');
 const customerRoutes = require('./routes/customers');
 const loanRoutes = require('./routes/loans');
 const emiRoutes = require('./routes/emis');
@@ -16,6 +18,8 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
+app.use('/api/companies', companyRoutes);
+app.use('/api/staff', staffRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/loans', loanRoutes);
 app.use('/api/emis', emiRoutes);
@@ -23,21 +27,21 @@ app.use('/api/export', exportRoutes);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
-// Ensure a default admin account exists on startup
-async function ensureAdmin() {
-  const email = process.env.ADMIN_EMAIL;
-  const password = process.env.ADMIN_PASSWORD;
-  const name = process.env.ADMIN_NAME || 'Admin';
+// Ensure a Super Admin account exists on startup (no company — manages all companies)
+async function ensureSuperAdmin() {
+  const email = process.env.SUPER_ADMIN_EMAIL;
+  const password = process.env.SUPER_ADMIN_PASSWORD;
+  const name = process.env.SUPER_ADMIN_NAME || 'Super Admin';
   if (!email || !password) return;
 
   const [rows] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
   if (!rows.length) {
     const hash = await bcrypt.hash(password, 10);
     await pool.query(
-      'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)',
-      [name, email, hash, 'admin']
+      'INSERT INTO users (name, email, password_hash, role, company_id) VALUES (?, ?, ?, ?, NULL)',
+      [name, email, hash, 'super_admin']
     );
-    console.log(`Default admin created: ${email}`);
+    console.log(`Super Admin created: ${email}`);
   }
 }
 
@@ -55,7 +59,7 @@ cron.schedule('5 0 * * *', async () => {
 
 const PORT = process.env.PORT || 5000;
 
-ensureAdmin()
+ensureSuperAdmin()
   .then(() => {
     app.listen(PORT, () => console.log(`Loan management API running on port ${PORT}`));
   })

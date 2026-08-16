@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Staff — Loan Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <p class="brand">📒 Loan Manager</p>
+    <nav>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="customers.html">Customers</a>
+      <a href="loans.html">Loans</a>
+      <a href="staff.html" class="active">Staff</a>
+    </nav>
+    <div class="user-box">
+      <div class="who" id="whoName">—</div>
+      <div id="whoEmail" style="margin-bottom:12px"></div>
+      <a href="account.html" class="btn btn-ghost btn-sm" style="margin-bottom:6px;display:block">Change password</a>
+      <a href="#" class="btn btn-ghost btn-sm" id="logoutBtn">Log out</a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="main-header">
+      <div>
+        <h1>Staff</h1>
+        <p>Team members in your company — only you (the admin) can add or remove them</p>
+      </div>
+      <button class="btn btn-primary" id="addBtn">+ Add staff</button>
+    </div>
+
+    <div class="panel">
+      <table>
+        <thead>
+          <tr><th>Name</th><th>Email</th><th>Phone</th><th>Added</th><th></th></tr>
+        </thead>
+        <tbody id="staffBody"></tbody>
+      </table>
+      <div class="empty-state" id="staffEmpty" style="display:none">
+        <div class="big">🧑‍💼</div>
+        No staff yet — add your first team member.
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal-overlay" id="staffModal">
+  <div class="modal">
+    <h3>Add staff</h3>
+    <p class="sub">Staff can only see the customers and loans they personally add</p>
+    <label for="s_name">Full name</label>
+    <input type="text" id="s_name">
+    <label for="s_email">Email</label>
+    <input type="email" id="s_email">
+    <label for="s_phone">Phone (optional)</label>
+    <input type="text" id="s_phone">
+    <label for="s_password">Password</label>
+    <input type="password" id="s_password" placeholder="At least 6 characters">
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="staffCancel">Cancel</button>
+      <button class="btn btn-primary" id="staffSave">Add staff</button>
+    </div>
+    <p class="error-msg" id="staffError"></p>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/staff.js"></script>
+</body>
+</html>

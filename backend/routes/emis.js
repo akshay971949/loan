@@ -3,10 +3,17 @@ const pool = require('../config/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const router = express.Router();
 
-// GET /api/emis/due - EMIs due within next N days (default 7), plus overdue, for THIS admin/user only.
-router.get('/due', authenticate, requireRole('admin'), async (req, res) => {
+// Builds the WHERE clause + params for "which loans can this user see"
+function scopeClause(req) {
+  if (req.user.role === 'admin') return { clause: 'loans.company_id = ?', param: req.user.company_id };
+  return { clause: 'loans.created_by = ?', param: req.user.id }; // staff
+}
+
+// GET /api/emis/due - EMIs due within next N days (default 7), plus overdue.
+router.get('/due', authenticate, requireRole('admin', 'staff'), async (req, res) => {
   try {
     const days = Number(req.query.days) || 7;
+    const scope = scopeClause(req);
     const [rows] = await pool.query(
       `SELECT emis.*, loans.customer_id, customers.full_name, customers.phone
        FROM emis
@@ -14,9 +21,9 @@ router.get('/due', authenticate, requireRole('admin'), async (req, res) => {
        JOIN customers ON loans.customer_id = customers.id
        WHERE emis.status IN ('pending','overdue')
          AND emis.due_date <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
-         AND loans.created_by = ?
+         AND ${scope.clause}
        ORDER BY emis.due_date ASC`,
-      [days, req.user.id]
+      [days, scope.param]
     );
     res.json(rows);
   } catch (err) {
@@ -24,18 +31,18 @@ router.get('/due', authenticate, requireRole('admin'), async (req, res) => {
   }
 });
 
-// GET /api/emis/overdue - Admin only
-router.get('/overdue', authenticate, requireRole('admin'), async (req, res) => {
+router.get('/overdue', authenticate, requireRole('admin', 'staff'), async (req, res) => {
   try {
+    const scope = scopeClause(req);
     const [rows] = await pool.query(
       `SELECT emis.*, loans.customer_id, customers.full_name, customers.phone
        FROM emis
        JOIN loans ON emis.loan_id = loans.id
        JOIN customers ON loans.customer_id = customers.id
        WHERE emis.due_date < CURDATE() AND emis.status IN ('pending','overdue')
-         AND loans.created_by = ?
+         AND ${scope.clause}
        ORDER BY emis.due_date ASC`,
-      [req.user.id]
+      [scope.param]
     );
     res.json(rows);
   } catch (err) {
@@ -43,28 +50,31 @@ router.get('/overdue', authenticate, requireRole('admin'), async (req, res) => {
   }
 });
 
-// GET /api/emis/stats - dashboard summary numbers. Admin only.
-router.get('/stats', authenticate, requireRole('admin'), async (req, res) => {
+router.get('/stats', authenticate, requireRole('admin', 'staff'), async (req, res) => {
   try {
-    const uid = req.user.id;
-    const [[customerCount]] = await pool.query('SELECT COUNT(*) AS count FROM customers WHERE created_by = ?', [uid]);
-    const [[activeLoans]] = await pool.query(`SELECT COUNT(*) AS count FROM loans WHERE status='active' AND created_by = ?`, [uid]);
-    const [[totalDisbursed]] = await pool.query('SELECT IFNULL(SUM(principal_amount),0) AS total FROM loans WHERE created_by = ?', [uid]);
+    const scope = scopeClause(req);
+    const customerScope = req.user.role === 'admin'
+      ? { clause: 'company_id = ?', param: req.user.company_id }
+      : { clause: 'created_by = ?', param: req.user.id };
+
+    const [[customerCount]] = await pool.query(`SELECT COUNT(*) AS count FROM customers WHERE ${customerScope.clause}`, [customerScope.param]);
+    const [[activeLoans]] = await pool.query(`SELECT COUNT(*) AS count FROM loans WHERE status='active' AND ${scope.clause}`, [scope.param]);
+    const [[totalDisbursed]] = await pool.query(`SELECT IFNULL(SUM(principal_amount),0) AS total FROM loans WHERE ${scope.clause}`, [scope.param]);
     const [[collected]] = await pool.query(
       `SELECT IFNULL(SUM(emis.paid_amount),0) AS total FROM emis
        JOIN loans ON emis.loan_id = loans.id
-       WHERE emis.status='paid' AND loans.created_by = ?`, [uid]
+       WHERE emis.status='paid' AND ${scope.clause}`, [scope.param]
     );
     const [[dueThisMonth]] = await pool.query(
       `SELECT COUNT(*) AS count, IFNULL(SUM(emis.emi_amount),0) AS total FROM emis
        JOIN loans ON emis.loan_id = loans.id
        WHERE emis.status IN ('pending','overdue') AND MONTH(emis.due_date)=MONTH(CURDATE()) AND YEAR(emis.due_date)=YEAR(CURDATE())
-         AND loans.created_by = ?`, [uid]
+         AND ${scope.clause}`, [scope.param]
     );
     const [[overdue]] = await pool.query(
       `SELECT COUNT(*) AS count, IFNULL(SUM(emis.emi_amount),0) AS total FROM emis
        JOIN loans ON emis.loan_id = loans.id
-       WHERE emis.due_date < CURDATE() AND emis.status IN ('pending','overdue') AND loans.created_by = ?`, [uid]
+       WHERE emis.due_date < CURDATE() AND emis.status IN ('pending','overdue') AND ${scope.clause}`, [scope.param]
     );
 
     res.json({
@@ -80,17 +90,18 @@ router.get('/stats', authenticate, requireRole('admin'), async (req, res) => {
   }
 });
 
-// PUT /api/emis/:id/pay - mark an EMI as paid (full or partial). Admin only.
-router.put('/:id/pay', authenticate, requireRole('admin'), async (req, res) => {
+router.put('/:id/pay', authenticate, requireRole('admin', 'staff'), async (req, res) => {
   try {
     const { paid_amount, paid_date } = req.body;
     const [rows] = await pool.query(
-      `SELECT emis.*, loans.created_by FROM emis JOIN loans ON emis.loan_id = loans.id WHERE emis.id = ?`,
+      `SELECT emis.*, loans.created_by, loans.company_id FROM emis JOIN loans ON emis.loan_id = loans.id WHERE emis.id = ?`,
       [req.params.id]
     );
     if (!rows.length) return res.status(404).json({ message: 'EMI not found' });
     const emi = rows[0];
-    if (emi.created_by !== req.user.id) return res.status(403).json({ message: 'Access denied' });
+
+    if (req.user.role === 'staff' && emi.created_by !== req.user.id) return res.status(403).json({ message: 'Access denied' });
+    if (req.user.role === 'admin' && emi.company_id !== req.user.company_id) return res.status(403).json({ message: 'Access denied' });
 
     const amount = Number(paid_amount) || Number(emi.emi_amount);
     const status = amount >= Number(emi.emi_amount) ? 'paid' : 'partial';
@@ -106,14 +117,13 @@ router.put('/:id/pay', authenticate, requireRole('admin'), async (req, res) => {
   }
 });
 
-// A lightweight helper endpoint: flips any pending EMI whose due_date has passed to 'overdue'.
-// Call this on dashboard load (also wired to a daily cron in server.js).
-router.post('/refresh-overdue', authenticate, requireRole('admin'), async (req, res) => {
+router.post('/refresh-overdue', authenticate, requireRole('admin', 'staff'), async (req, res) => {
   try {
+    const scope = scopeClause(req);
     const [result] = await pool.query(
       `UPDATE emis e JOIN loans l ON e.loan_id = l.id
-       SET e.status='overdue' WHERE e.status='pending' AND e.due_date < CURDATE() AND l.created_by = ?`,
-      [req.user.id]
+       SET e.status='overdue' WHERE e.status='pending' AND e.due_date < CURDATE() AND ${scope.clause.replace('loans.', 'l.')}`,
+      [scope.param]
     );
     res.json({ message: 'Overdue EMIs refreshed', updated: result.affectedRows });
   } catch (err) {

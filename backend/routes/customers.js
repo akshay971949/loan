@@ -3,12 +3,18 @@ const pool = require('../config/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const router = express.Router();
 
-// GET /api/customers - list only what THIS admin/user added (admin only), supports ?search=
-router.get('/', authenticate, requireRole('admin'), async (req, res) => {
+// GET /api/customers - admin: everyone in their company. staff: only what THEY added.
+router.get('/', authenticate, requireRole('admin', 'staff'), async (req, res) => {
   try {
     const { search } = req.query;
-    let sql = 'SELECT * FROM customers WHERE created_by = ?';
-    const params = [req.user.id];
+    let sql, params;
+    if (req.user.role === 'admin') {
+      sql = 'SELECT * FROM customers WHERE company_id = ?';
+      params = [req.user.company_id];
+    } else {
+      sql = 'SELECT * FROM customers WHERE created_by = ?';
+      params = [req.user.id];
+    }
     if (search) {
       sql += ' AND (full_name LIKE ? OR phone LIKE ? OR email LIKE ?)';
       params.push(`%${search}%`, `%${search}%`, `%${search}%`);
@@ -26,31 +32,34 @@ router.get('/:id', authenticate, async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM customers WHERE id = ?', [req.params.id]);
     if (!rows.length) return res.status(404).json({ message: 'Customer not found' });
+    const c = rows[0];
 
-    // A customer can only view their own record; an admin/user can only view what they added
-    if (req.user.role === 'customer' && rows[0].user_id !== req.user.id) {
+    if (req.user.role === 'customer' && c.user_id !== req.user.id) {
       return res.status(403).json({ message: 'Access denied' });
     }
-    if (req.user.role === 'admin' && rows[0].created_by !== req.user.id) {
+    if (req.user.role === 'staff' && c.created_by !== req.user.id) {
       return res.status(403).json({ message: 'Access denied' });
     }
-    res.json(rows[0]);
+    if (req.user.role === 'admin' && c.company_id !== req.user.company_id) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+    res.json(c);
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch customer', error: err.message });
   }
 });
 
-// POST /api/customers - admin creates a customer profile (no login required)
-router.post('/', authenticate, requireRole('admin'), async (req, res) => {
+// POST /api/customers - admin or staff creates a customer profile within their own company
+router.post('/', authenticate, requireRole('admin', 'staff'), async (req, res) => {
   try {
     const { full_name, email, phone, address, id_proof_type, id_proof_number, occupation, monthly_income } = req.body;
     if (!full_name || !phone) {
       return res.status(400).json({ message: 'full_name and phone are required' });
     }
     const [result] = await pool.query(
-      `INSERT INTO customers (full_name, email, phone, address, id_proof_type, id_proof_number, occupation, monthly_income, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [full_name, email || null, phone, address || null, id_proof_type || null, id_proof_number || null, occupation || null, monthly_income || null, req.user.id]
+      `INSERT INTO customers (company_id, full_name, email, phone, address, id_proof_type, id_proof_number, occupation, monthly_income, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.user.company_id, full_name, email || null, phone, address || null, id_proof_type || null, id_proof_number || null, occupation || null, monthly_income || null, req.user.id]
     );
     res.status(201).json({ id: result.insertId, message: 'Customer created' });
   } catch (err) {
@@ -59,11 +68,14 @@ router.post('/', authenticate, requireRole('admin'), async (req, res) => {
 });
 
 // PUT /api/customers/:id
-router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
+router.put('/:id', authenticate, requireRole('admin', 'staff'), async (req, res) => {
   try {
-    const [existing] = await pool.query('SELECT created_by FROM customers WHERE id = ?', [req.params.id]);
+    const [existing] = await pool.query('SELECT company_id, created_by FROM customers WHERE id = ?', [req.params.id]);
     if (!existing.length) return res.status(404).json({ message: 'Customer not found' });
-    if (existing[0].created_by !== req.user.id) return res.status(403).json({ message: 'Access denied' });
+    const c = existing[0];
+
+    if (req.user.role === 'staff' && c.created_by !== req.user.id) return res.status(403).json({ message: 'Access denied' });
+    if (req.user.role === 'admin' && c.company_id !== req.user.company_id) return res.status(403).json({ message: 'Access denied' });
 
     const { full_name, email, phone, address, id_proof_type, id_proof_number, occupation, monthly_income } = req.body;
     await pool.query(
@@ -77,11 +89,14 @@ router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
 });
 
 // DELETE /api/customers/:id
-router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
+router.delete('/:id', authenticate, requireRole('admin', 'staff'), async (req, res) => {
   try {
-    const [existing] = await pool.query('SELECT created_by FROM customers WHERE id = ?', [req.params.id]);
+    const [existing] = await pool.query('SELECT company_id, created_by FROM customers WHERE id = ?', [req.params.id]);
     if (!existing.length) return res.status(404).json({ message: 'Customer not found' });
-    if (existing[0].created_by !== req.user.id) return res.status(403).json({ message: 'Access denied' });
+    const c = existing[0];
+
+    if (req.user.role === 'staff' && c.created_by !== req.user.id) return res.status(403).json({ message: 'Access denied' });
+    if (req.user.role === 'admin' && c.company_id !== req.user.company_id) return res.status(403).json({ message: 'Access denied' });
 
     await pool.query('DELETE FROM customers WHERE id = ?', [req.params.id]);
     res.json({ message: 'Customer deleted' });

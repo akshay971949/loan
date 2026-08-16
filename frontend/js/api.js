@@ -35,9 +35,10 @@ async function api(path, { method = 'GET', body, auth = true } = {}) {
   });
 
   if (res.status === 401) {
-    const wasAdmin = getUser() && getUser().role === 'admin';
+    const priorUser = getUser();
+    const wasStaffTier = priorUser && ['super_admin', 'admin', 'staff'].includes(priorUser.role);
     clearSession();
-    window.location.href = wasAdmin ? 'user-login.html' : 'customer-login.html';
+    window.location.href = wasStaffTier ? 'user-login.html' : 'customer-login.html';
     return;
   }
 
@@ -74,16 +75,16 @@ async function downloadCsv(path, filename) {
 
 // Protects a page: redirects to the right portal's login if not authenticated, or if role doesn't match.
 function guardPage(requiredRole) {
-  const loginPage = requiredRole === 'customer' ? 'customer-login.html'
-    : requiredRole === 'admin' ? 'user-login.html'
-    : 'index.html';
+  const allowed = Array.isArray(requiredRole) ? requiredRole : (requiredRole ? [requiredRole] : null);
+  const isStaffTier = r => ['super_admin', 'admin', 'staff'].includes(r);
+
   const user = getUser();
   if (!getToken() || !user) {
-    window.location.href = loginPage;
+    window.location.href = (allowed && allowed[0] === 'customer') ? 'customer-login.html' : 'user-login.html';
     return null;
   }
-  if (requiredRole && user.role !== requiredRole) {
-    window.location.href = user.role === 'admin' ? 'user-login.html' : 'customer-login.html';
+  if (allowed && !allowed.includes(user.role)) {
+    window.location.href = isStaffTier(user.role) ? 'user-login.html' : 'customer-login.html';
     return null;
   }
   return user;

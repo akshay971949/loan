@@ -1,21 +1,33 @@
--- Loan Management System - MySQL Schema
+-- Loan Management System - MySQL Schema (multi-company hierarchy)
+-- SUPER_ADMIN (you) -> manages Companies -> each Company has its own Admin + Staff
+
 CREATE DATABASE IF NOT EXISTS loan_management CHARACTER SET utf8mb4;
 USE loan_management;
 
--- Users: admin (staff) and customer logins
+-- Companies (tenants) - created by the Super Admin
+CREATE TABLE IF NOT EXISTS companies (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(150) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Users: super_admin (no company), admin (owns a company), staff (belongs to a company), customer (borrower)
 CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  company_id INT NULL,
   name VARCHAR(150) NOT NULL,
   email VARCHAR(150) NOT NULL UNIQUE,
   phone VARCHAR(20),
   password_hash VARCHAR(255) NOT NULL,
-  role ENUM('admin','customer') NOT NULL DEFAULT 'customer',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  role ENUM('super_admin','admin','staff','customer') NOT NULL DEFAULT 'customer',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
 );
 
--- Customers: profile / KYC details. Linked to a user login (nullable if added by admin only)
+-- Customers: profile / KYC details. Belongs to a company; linked to a user login (nullable)
 CREATE TABLE IF NOT EXISTS customers (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  company_id INT NOT NULL,
   user_id INT UNIQUE,
   full_name VARCHAR(150) NOT NULL,
   email VARCHAR(150),
@@ -27,6 +39,7 @@ CREATE TABLE IF NOT EXISTS customers (
   monthly_income DECIMAL(12,2),
   created_by INT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
   FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
@@ -34,6 +47,7 @@ CREATE TABLE IF NOT EXISTS customers (
 -- Loans
 CREATE TABLE IF NOT EXISTS loans (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  company_id INT NOT NULL,
   customer_id INT NOT NULL,
   loan_type VARCHAR(50) DEFAULT 'Personal',
   principal_amount DECIMAL(14,2) NOT NULL,
@@ -44,6 +58,7 @@ CREATE TABLE IF NOT EXISTS loans (
   status ENUM('active','closed','defaulted') DEFAULT 'active',
   created_by INT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
   FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
   FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
@@ -67,3 +82,6 @@ CREATE TABLE IF NOT EXISTS emis (
 CREATE INDEX idx_emis_due_date ON emis(due_date);
 CREATE INDEX idx_emis_status ON emis(status);
 CREATE INDEX idx_loans_customer ON loans(customer_id);
+CREATE INDEX idx_loans_company ON loans(company_id);
+CREATE INDEX idx_customers_company ON customers(company_id);
+CREATE INDEX idx_users_company ON users(company_id);
