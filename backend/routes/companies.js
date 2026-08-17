@@ -1,6 +1,9 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const pool = require('../config/db');
+
+function isValidGmail(email) { return /^[A-Z0-9._%+-]+@gmail\.com$/i.test(String(email || '').trim()); }
+function isValidPhone(phone) { return /^\+?[0-9]{10,15}$/.test(String(phone || '').replace(/[\s-]/g, '')); }
 const { authenticate, requireRole } = require('../middleware/auth');
 const router = express.Router();
 
@@ -26,10 +29,12 @@ router.get('/', authenticate, requireRole('super_admin'), async (req, res) => {
 router.post('/', authenticate, requireRole('super_admin'), async (req, res) => {
   const conn = await pool.getConnection();
   try {
-    const { company_name, admin_name, admin_email, admin_password } = req.body;
-    if (!company_name || !admin_name || !admin_email || !admin_password) {
+    const { company_name, admin_name, admin_email, admin_password, admin_phone } = req.body;
+    if (!company_name || !admin_name || !admin_email || !admin_password || !admin_phone) {
       return res.status(400).json({ message: 'Company name, admin name, admin email and admin password are all required' });
     }
+    if (!isValidGmail(admin_email)) return res.status(400).json({ message: 'Only a valid Gmail address (@gmail.com) is allowed' });
+    if (!isValidPhone(admin_phone)) return res.status(400).json({ message: 'Enter a valid phone number' });
     if (admin_password.length < 6) {
       return res.status(400).json({ message: 'Admin password must be at least 6 characters' });
     }
@@ -46,8 +51,8 @@ router.post('/', authenticate, requireRole('super_admin'), async (req, res) => {
 
     const hash = await bcrypt.hash(admin_password, 10);
     await conn.query(
-      'INSERT INTO users (company_id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?)',
-      [companyId, admin_name, admin_email, hash, 'admin']
+      'INSERT INTO users (company_id, name, email, phone, password_hash, role) VALUES (?, ?, ?, ?, ?, ?)',
+      [companyId, admin_name, admin_email, admin_phone, hash, 'admin']
     );
 
     await conn.commit();

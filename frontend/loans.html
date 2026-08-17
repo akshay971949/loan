@@ -55,7 +55,7 @@
 
 <div class="modal-overlay" id="loanModal">
   <div class="modal">
-    <h3>New loan</h3>
+    <h3 id="loanModalTitle">New loan</h3>
     <p class="sub">Creates the loan and auto-generates the EMI schedule</p>
     <label for="l_customer">Customer</label>
     <select id="l_customer"></select>
@@ -64,9 +64,11 @@
       <div><label for="l_principal">Principal amount</label><input type="number" id="l_principal" step="0.01"></div>
     </div>
     <div class="grid-2">
-      <div><label for="l_rate">Monthly interest rate (%)</label><input type="number" id="l_rate" step="0.01"></div>
-      <div><label for="l_tenure">Tenure (months)</label><input type="number" id="l_tenure"></div>
+      <div><label for="l_rate">Monthly interest rate (%)</label><input type="number" id="l_rate" step="0.0001" placeholder="Enter rate OR EMI"></div>
+      <div><label for="l_emi">Monthly EMI amount</label><input type="number" id="l_emi" step="0.01" placeholder="Enter EMI OR rate"></div>
     </div>
+    <label for="l_tenure">Tenure (months)</label>
+    <input type="number" id="l_tenure" min="1">
     <label for="l_start">Start date</label>
     <input type="date" id="l_start">
     <p class="muted" id="emiPreview" style="margin-top:12px;font-size:13px"></p>

@@ -4,6 +4,22 @@ const { authenticate, requireRole } = require('../middleware/auth');
 const { generateSchedule } = require('../utils/emi');
 const router = express.Router();
 
+function solveMonthlyRate(principal, emi, tenure) {
+  if (emi <= principal / tenure) return emi === principal / tenure ? 0 : null;
+  const payment = r => {
+    if (r === 0) return principal / tenure;
+    const factor = Math.pow(1 + r, tenure);
+    return (principal * r * factor) / (factor - 1);
+  };
+  let low = 0, high = 1; // up to 100% monthly
+  if (payment(high) < emi) return null;
+  for (let i = 0; i < 100; i++) {
+    const mid = (low + high) / 2;
+    if (payment(mid) < emi) low = mid; else high = mid;
+  }
+  return +(((low + high) / 2) * 100).toFixed(4);
+}
+
 // GET /api/loans - admin: whole company. staff: only what THEY added. customer: only their own.
 router.get('/', authenticate, async (req, res) => {
   try {
@@ -17,8 +33,8 @@ router.get('/', authenticate, async (req, res) => {
       where.push('customers.user_id = ?');
       params.push(req.user.id);
     } else if (req.user.role === 'staff') {
-      where.push('loans.created_by = ?');
-      params.push(req.user.id);
+      where.push('loans.company_id = ?');
+      params.push(req.user.company_id);
     } else if (req.user.role === 'admin') {
       where.push('loans.company_id = ?');
       params.push(req.user.company_id);
@@ -51,7 +67,7 @@ router.get('/:id', authenticate, async (req, res) => {
     if (req.user.role === 'customer' && loan.user_id !== req.user.id) {
       return res.status(403).json({ message: 'Access denied' });
     }
-    if (req.user.role === 'staff' && loan.created_by !== req.user.id) {
+    if (req.user.role === 'staff' && loan.company_id !== req.user.company_id) {
       return res.status(403).json({ message: 'Access denied' });
     }
     if (req.user.role === 'admin' && loan.company_id !== req.user.company_id) {
@@ -69,9 +85,9 @@ router.get('/:id', authenticate, async (req, res) => {
 router.post('/', authenticate, requireRole('admin', 'staff'), async (req, res) => {
   const conn = await pool.getConnection();
   try {
-    const { customer_id, loan_type, principal_amount, interest_rate, tenure_months, start_date } = req.body;
-    if (!customer_id || !principal_amount || !interest_rate || !tenure_months || !start_date) {
-      return res.status(400).json({ message: 'customer_id, principal_amount, interest_rate, tenure_months and start_date are required' });
+    const { customer_id, loan_type, principal_amount, interest_rate, emi_amount, tenure_months, start_date } = req.body;
+    if (!customer_id || !principal_amount || !tenure_months || !start_date || (!interest_rate && !emi_amount)) {
+      return res.status(400).json({ message: 'Customer, principal, tenure, start date and either monthly interest rate or EMI amount are required' });
     }
 
     // Verify the customer belongs to this user's company (and, for staff, that they created it)
@@ -83,8 +99,21 @@ router.post('/', authenticate, requireRole('admin', 'staff'), async (req, res) =
       return res.status(403).json({ message: 'You can only create loans for customers you added' });
     }
 
+    let resolvedRate = interest_rate !== undefined && interest_rate !== null && interest_rate !== '' ? Number(interest_rate) : null;
+    let resolvedEmi = emi_amount !== undefined && emi_amount !== null && emi_amount !== '' ? Number(emi_amount) : null;
+
+    if (resolvedRate !== null) {
+      if (resolvedRate < 0) return res.status(400).json({ message: 'Interest rate cannot be negative' });
+      resolvedEmi = generateSchedule(Number(principal_amount), resolvedRate, Number(tenure_months), start_date).emi;
+    } else {
+      resolvedEmi = Number(resolvedEmi);
+      if (!Number.isFinite(resolvedEmi) || resolvedEmi <= 0) return res.status(400).json({ message: 'EMI amount must be greater than 0' });
+      resolvedRate = solveMonthlyRate(Number(principal_amount), resolvedEmi, Number(tenure_months));
+      if (resolvedRate === null) return res.status(400).json({ message: 'The EMI amount is not valid for this principal and tenure' });
+    }
+
     const { emi, schedule } = generateSchedule(
-      Number(principal_amount), Number(interest_rate), Number(tenure_months), start_date
+      Number(principal_amount), resolvedRate, Number(tenure_months), start_date
     );
 
     await conn.beginTransaction();
@@ -92,7 +121,7 @@ router.post('/', authenticate, requireRole('admin', 'staff'), async (req, res) =
     const [loanResult] = await conn.query(
       `INSERT INTO loans (company_id, customer_id, loan_type, principal_amount, interest_rate, tenure_months, emi_amount, start_date, created_by)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.user.company_id, customer_id, loan_type || 'Personal', principal_amount, interest_rate, tenure_months, emi, start_date, req.user.id]
+      [req.user.company_id, customer_id, loan_type || 'Personal', principal_amount, resolvedRate, tenure_months, emi, start_date, req.user.id]
     );
     const loanId = loanResult.insertId;
 
@@ -114,8 +143,68 @@ router.post('/', authenticate, requireRole('admin', 'staff'), async (req, res) =
   }
 });
 
+// PUT /api/loans/:id - edit loan, company admin only. EMI schedule is regenerated.
+router.put('/:id', authenticate, requireRole('admin'), async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    const { customer_id, loan_type, principal_amount, interest_rate, emi_amount, tenure_months, start_date } = req.body;
+    const [existing] = await conn.query('SELECT * FROM loans WHERE id = ?', [req.params.id]);
+    if (!existing.length) return res.status(404).json({ message: 'Loan not found' });
+    if (existing[0].company_id !== req.user.company_id) return res.status(403).json({ message: 'Access denied' });
+    if (!customer_id || !principal_amount || !tenure_months || !start_date || (!interest_rate && !emi_amount)) {
+      return res.status(400).json({ message: 'Customer, principal, tenure, start date and either monthly interest rate or EMI amount are required' });
+    }
+
+    const [custRows] = await conn.query('SELECT id, company_id FROM customers WHERE id = ?', [customer_id]);
+    if (!custRows.length || custRows[0].company_id !== req.user.company_id) return res.status(403).json({ message: 'Customer is not in your company' });
+
+    let resolvedRate = interest_rate !== undefined && interest_rate !== null && interest_rate !== '' ? Number(interest_rate) : null;
+    let resolvedEmi = emi_amount !== undefined && emi_amount !== null && emi_amount !== '' ? Number(emi_amount) : null;
+    if (resolvedRate !== null) {
+      if (resolvedRate < 0) return res.status(400).json({ message: 'Interest rate cannot be negative' });
+      resolvedEmi = generateSchedule(Number(principal_amount), resolvedRate, Number(tenure_months), start_date).emi;
+    } else {
+      resolvedRate = solveMonthlyRate(Number(principal_amount), Number(resolvedEmi), Number(tenure_months));
+      if (resolvedRate === null) return res.status(400).json({ message: 'The EMI amount is not valid for this principal and tenure' });
+    }
+    const { emi, schedule } = generateSchedule(Number(principal_amount), resolvedRate, Number(tenure_months), start_date);
+
+    await conn.beginTransaction();
+    await conn.query(
+      `UPDATE loans SET customer_id=?, loan_type=?, principal_amount=?, interest_rate=?, tenure_months=?, emi_amount=?, start_date=? WHERE id=?`,
+      [customer_id, loan_type || 'Personal', principal_amount, resolvedRate, tenure_months, emi, start_date, req.params.id]
+    );
+    await conn.query('DELETE FROM emis WHERE loan_id = ?', [req.params.id]);
+    const values = schedule.map(row => [req.params.id, row.emi_number, row.due_date, row.emi_amount, row.principal_component, row.interest_component]);
+    await conn.query(
+      `INSERT INTO emis (loan_id, emi_number, due_date, emi_amount, principal_component, interest_component) VALUES ?`,
+      [values]
+    );
+    await conn.commit();
+    res.json({ message: 'Loan updated', emi_amount: emi, interest_rate: resolvedRate });
+  } catch (err) {
+    await conn.rollback();
+    res.status(500).json({ message: 'Failed to update loan', error: err.message });
+  } finally {
+    conn.release();
+  }
+});
+
+// DELETE /api/loans/:id - company admin only
+router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
+  try {
+    const [existing] = await pool.query('SELECT company_id FROM loans WHERE id = ?', [req.params.id]);
+    if (!existing.length) return res.status(404).json({ message: 'Loan not found' });
+    if (existing[0].company_id !== req.user.company_id) return res.status(403).json({ message: 'Access denied' });
+    await pool.query('DELETE FROM loans WHERE id = ?', [req.params.id]);
+    res.json({ message: 'Loan deleted' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to delete loan', error: err.message });
+  }
+});
+
 // PUT /api/loans/:id/status - update loan status (active/closed/defaulted)
-router.put('/:id/status', authenticate, requireRole('admin', 'staff'), async (req, res) => {
+router.put('/:id/status', authenticate, requireRole('admin'), async (req, res) => {
   try {
     const { status } = req.body;
     if (!['active', 'closed', 'defaulted'].includes(status)) {
@@ -125,7 +214,7 @@ router.put('/:id/status', authenticate, requireRole('admin', 'staff'), async (re
     if (!existing.length) return res.status(404).json({ message: 'Loan not found' });
     const loan = existing[0];
 
-    if (req.user.role === 'staff' && loan.created_by !== req.user.id) return res.status(403).json({ message: 'Access denied' });
+    
     if (req.user.role === 'admin' && loan.company_id !== req.user.company_id) return res.status(403).json({ message: 'Access denied' });
 
     await pool.query('UPDATE loans SET status = ? WHERE id = ?', [status, req.params.id]);

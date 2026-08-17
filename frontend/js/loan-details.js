@@ -23,6 +23,7 @@ async function load() {
   document.getElementById('loanTitle').textContent = `Loan #${loan.id} — ${loan.full_name}`;
   document.getElementById('loanSub').textContent = `${loan.loan_type} • ${loan.phone} • started ${formatDate(loan.start_date)}`;
   document.getElementById('statusSelect').value = loan.status;
+  if (user.role !== 'admin') document.getElementById('statusSelect').disabled = true;
 
   const paid = emis.filter(e => e.status === 'paid').reduce((s, e) => s + Number(e.paid_amount), 0);
   const outstanding = Number(loan.principal_amount) + emis.reduce((s, e) => s + Number(e.interest_component), 0) - paid;
@@ -76,6 +77,7 @@ document.getElementById('payConfirm').addEventListener('click', async () => {
 });
 
 document.getElementById('statusSelect').addEventListener('change', async (e) => {
+  if (user.role !== 'admin') return;
   try {
     await api(`/loans/${loanId}/status`, { method: 'PUT', body: { status: e.target.value } });
   } catch (err) {

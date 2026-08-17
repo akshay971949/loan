@@ -193,3 +193,5 @@ tbody tr:hover { background: var(--surface-2); }
   .main { padding: 20px; }
   .grid-2 { grid-template-columns: 1fr; }
 }
+
+.success-msg { color: #1f7a45; margin-top: 12px; font-size: 14px; }

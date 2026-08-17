@@ -85,3 +85,17 @@ CREATE INDEX idx_loans_customer ON loans(customer_id);
 CREATE INDEX idx_loans_company ON loans(company_id);
 CREATE INDEX idx_customers_company ON customers(company_id);
 CREATE INDEX idx_users_company ON users(company_id);
+
+
+-- Password reset tokens (one-time, 30-minute expiry)
+CREATE TABLE IF NOT EXISTS password_resets (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  token_hash CHAR(64) NOT NULL UNIQUE,
+  expires_at DATETIME NOT NULL,
+  used_at DATETIME NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_password_resets_user (user_id),
+  INDEX idx_password_resets_expiry (expires_at)
+);

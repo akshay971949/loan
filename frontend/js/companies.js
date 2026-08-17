@@ -47,7 +47,7 @@ async function removeCompany(id) {
 
 document.getElementById('addBtn').addEventListener('click', () => {
   document.getElementById('companyError').style.display = 'none';
-  ['c_name','c_admin_name','c_admin_email','c_admin_password'].forEach(id => document.getElementById(id).value = '');
+  ['c_name','c_admin_name','c_admin_email','c_admin_phone','c_admin_password'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('companyModal').classList.add('open');
 });
 document.getElementById('companyCancel').addEventListener('click', () => {
@@ -61,10 +61,11 @@ document.getElementById('companySave').addEventListener('click', async () => {
     company_name: document.getElementById('c_name').value.trim(),
     admin_name: document.getElementById('c_admin_name').value.trim(),
     admin_email: document.getElementById('c_admin_email').value.trim(),
+    admin_phone: document.getElementById('c_admin_phone').value.trim(),
     admin_password: document.getElementById('c_admin_password').value
   };
-  if (!body.company_name || !body.admin_name || !body.admin_email || !body.admin_password) {
-    errorMsg.textContent = 'All fields are required';
+  if (!body.company_name || !body.admin_name || !body.admin_email || !body.admin_phone || !body.admin_password) {
+    errorMsg.textContent = 'All fields are required (including Gmail and phone)';
     errorMsg.style.display = 'block';
     return;
   }
