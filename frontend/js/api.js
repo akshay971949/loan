@@ -1,5 +1,7 @@
 // Change this if your backend runs on a different host/port
-const API_BASE = 'https://loan-management-production-a29b.up.railway.app/api';
+const API_BASE = 'mysql://
+CLICK_TO:REVEAL_PASSWORD
+@mysql-2446274e-akcartoon1255-f1cc.d.aivencloud.com:19882/defaultdb?ssl-mode=REQUIRED';
 
 function getToken() {
   return localStorage.getItem('lm_token');
