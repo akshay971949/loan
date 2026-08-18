@@ -36,7 +36,6 @@ async function api(path, { method = 'GET', body, auth = true } = {}) {
 
   if (res.status === 401) {
     clearSession();
-    window.location.href = wasStaffTier ? 'user-login.html' : 'customer-login.html';
     window.location.href = 'user-login.html';
     return;
   }
