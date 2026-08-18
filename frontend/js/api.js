@@ -1,7 +1,5 @@
 // Change this if your backend runs on a different host/port
-const API_BASE = 'mysql://
-CLICK_TO:REVEAL_PASSWORD
-@mysql-2446274e-akcartoon1255-f1cc.d.aivencloud.com:19882/defaultdb?ssl-mode=REQUIRED';
+const API_BASE = 'https://loan-pdyh.onrender.com/api';
 
 function getToken() {
   return localStorage.getItem('lm_token');
