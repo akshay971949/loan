@@ -8,8 +8,8 @@ A full-stack, multi-company loan/EMI management app: Node.js + Express backend, 
 SUPER_ADMIN (you)
    │
    ├── Company A
-   │      ├── Admin   — manages that company's Staff, sees all of the company's data
-   │      └── Staff    — only sees the customers/loans they personally added
+   │      ├── Admin   — manages that company's Staff, sees/edits/deletes all of the company's loans
+   │      └── Staff    — adds customers & loans, but only sees the ones they personally added
    │
    ├── Company B
    │      ├── Admin
@@ -20,21 +20,22 @@ SUPER_ADMIN (you)
           └── Staff
 ```
 
-- **Super Admin** — the platform owner. Creates and removes Companies (each creation also creates that company's first Admin account). Doesn't see day-to-day loan data.
-- **Admin** (one per company, more can't be added — only Super Admin creates a company's admin) — manages Staff for their own company (add/remove), and sees every customer/loan within their company.
-- **Staff** — added by their company's Admin. Can add customers and loans, but can only see the ones they personally created. **Only the Admin can add or remove Staff — Staff can never manage other accounts.**
-- **Customer** — a borrower. Can self-register to view their own loan/EMI status.
+- **Super Admin** — the platform owner. Creates and removes Companies (each creation also creates that company's first Admin account). Can reset a company's Admin password. Doesn't see day-to-day loan data.
+- **Admin** (one per company) — manages Staff for their own company (add/remove/reset their password), and sees every customer/loan within their company. **Only the Admin can edit or delete a loan** — Staff cannot.
+- **Staff** — added by their company's Admin. Can add customers and create loans, mark EMIs as paid, and export their own data — but can only see what they personally created, and can't edit/delete loans or manage other accounts.
+- **Customers have no login** — they're borrower records only, managed entirely by Staff/Admin. There is no customer-facing portal.
 
 ## Features
 
-- **Separate staff & customer portals** — distinct sign-in pages (`user-login.html` covers Super Admin/Admin/Staff, `customer-login.html` for borrowers).
-- **Strict data isolation** — enforced on the backend, not just hidden in the UI: Staff only ever see what they added; Admins see their whole company; different companies never see each other's data.
-- **Only Admins manage Staff** — the ability to add/remove team accounts is restricted to the company's Admin, closing the earlier gap where any user could remove any other user.
-- **Password change** — any signed-in user can change their password from "Change password" in the sidebar.
-- **Customer management** — add, search, and view borrower profiles (KYC-style fields).
-- **Loans & EMI schedule** — create a loan and the system auto-generates the full reducing-balance EMI schedule. **Interest rate is entered as a monthly percentage** (not annual).
+- **Single staff sign-in** (`user-login.html`) — covers Super Admin, Admin, and Staff. No customer login/signup exists.
+- **Strict data isolation** — enforced on the backend: Staff only ever see what they added; Admins see their whole company; different companies never see each other's data.
+- **Only Admins manage Staff and loans** — adding/removing Staff, and editing/deleting a loan, are Admin-only actions.
+- **Password reset by the managing role** — if someone forgets their password, the person who manages them resets it directly: the company's Admin resets a Staff member's password from the "Staff" page; the Super Admin resets a company's Admin password from the "Companies" page. No email or SMS required.
+- **Customer management** — add, search, and view borrower profiles, with phone (10-digit Indian mobile) and email format validation. No income field.
+- **Loans — EMI-driven**: instead of entering an interest rate, you enter the **principal, the desired monthly EMI amount, and the tenure** — the system calculates the resulting monthly interest rate automatically and generates the full reducing-balance schedule.
+- **Loan editing** (Admin only) — a loan's terms can be edited as long as no EMI has been paid yet (editing after payments are recorded is blocked, to protect the payment history). Editing a loan regenerates its EMI schedule.
+- **Loan deletion** (Admin only) — removes the loan and its entire EMI schedule.
 - **EMI tracking** — dashboard of due & overdue EMIs, mark payments (full or partial), auto-flip to "overdue" via a daily cron job.
-- **Customer self-service portal** — customers who sign up can see their own loans and payment status (once a company has linked them as a customer).
 - **CSV export** — customers, loans, full EMI schedules, and the due/overdue collections list (scoped to what the signed-in user can see).
 
 ## Tech stack
@@ -51,8 +52,6 @@ SOURCE backend/database/schema.sql;
 ```
 
 This creates the `loan_management` database and all tables (`companies`, `users`, `customers`, `loans`, `emis`).
-
-**If you're upgrading from an earlier single-tier version**, this is a breaking schema change (the `role` column now has 4 values, and `company_id` is required). The simplest path is to drop the old tables and re-run the full `schema.sql` fresh, then re-create your data through the app.
 
 ## 2. Configure and run the backend
 
@@ -82,32 +81,33 @@ If your backend isn't on `http://localhost:5000`, update `API_BASE` at the top o
 
 ## 4. Log in
 
-Open `index.html` — it's a chooser page that links to the two portals:
+Open `index.html` — it redirects straight to `user-login.html` (the only sign-in page).
 
-- **Staff tier (Super Admin / Admin / Staff)**: `user-login.html`.
-  - Log in as the **Super Admin** first (using your `.env` credentials) → you'll land on `companies.html`. Create a company here — this also creates that company's first **Admin** account (you set their email/password directly).
-  - That Admin then logs in at the same `user-login.html` → lands on `dashboard.html`. From "Staff" in the sidebar, they can add Staff accounts for their own company.
-  - Staff log in the same way and land on the same dashboard, but only ever see what they personally added.
-- **Customer**: `customer-login.html`, or `signup.html` to self-register. Customers land on `customer-portal.html`, a read-only view of their own loans (once a company has added them as a customer).
+1. Log in as the **Super Admin** first (using your `.env` credentials) → you land on `companies.html`. Create a company here — this also creates that company's first **Admin** account (you set their email/password directly).
+2. That Admin then logs in at the same `user-login.html` → lands on `dashboard.html`. From "Staff" in the sidebar, they add Staff accounts for their own company, and can reset a staff member's password if they forget it.
+3. Staff log in the same way and land on the same dashboard, but only ever see the customers/loans they personally added, and don't see the "Staff" menu.
 
-**Note on interest rates:** the interest rate field on a loan is a **monthly** percentage, not annual. If you're used to quoting annual rates, divide by 12 first (e.g. 12% annual ≈ 1% monthly).
+**Note on loans:** instead of an interest rate, enter the **principal, the EMI amount you want, and the tenure** — the monthly interest rate is calculated automatically to match.
 
 ## API overview
 
 | Method | Route | Description |
 |---|---|---|
-| POST | `/api/auth/signup` | Customer self-registration |
-| POST | `/api/auth/login` | Login (send `portal: 'staff'\|'customer'` to enforce matching account type) |
+| POST | `/api/auth/login` | Login |
 | PUT | `/api/auth/change-password` | Change your own password (any signed-in user) |
 | GET/POST | `/api/companies` | List / create companies (Super Admin only) |
 | DELETE | `/api/companies/:id` | Remove a company and everything in it (Super Admin only) |
+| PUT | `/api/companies/:id/reset-admin-password` | Super Admin resets that company's Admin password |
 | GET/POST | `/api/staff` | List / add staff in your own company (Admin only) |
 | DELETE | `/api/staff/:id` | Remove a staff account from your own company (Admin only) |
+| PUT | `/api/staff/:id/reset-password` | Admin resets a staff member's password (their own company only) |
 | GET/POST | `/api/customers` | List / create customers — scoped to company (Admin) or self (Staff) |
 | GET/PUT/DELETE | `/api/customers/:id` | Manage a customer |
-| GET/POST | `/api/loans` | List loans / create a loan (auto-generates EMI schedule) |
-| GET | `/api/loans/:id` | Loan details + full EMI schedule |
-| PUT | `/api/loans/:id/status` | Update loan status |
+| GET/POST | `/api/loans` | List loans / create a loan (send `principal_amount`, `emi_amount`, `tenure_months`, `start_date`) |
+| GET | `/api/loans/:id` | Loan details + full EMI schedule (`editable: false` once any EMI is paid) |
+| PUT | `/api/loans/:id` | Edit a loan's terms (Admin only, only before any payment is recorded) |
+| DELETE | `/api/loans/:id` | Delete a loan and its schedule (Admin only) |
+| PUT | `/api/loans/:id/status` | Update loan status (active/closed/defaulted) |
 | GET | `/api/emis/due?days=7` | EMIs due soon + overdue |
 | GET | `/api/emis/overdue` | Overdue EMIs only |
 | GET | `/api/emis/stats` | Dashboard summary numbers |
@@ -117,5 +117,6 @@ Open `index.html` — it's a chooser page that links to the two portals:
 ## Notes
 
 - Passwords are hashed with bcrypt; tokens are JWTs with a 7-day expiry (configurable).
-- The EMI schedule uses the standard reducing-balance formula: `EMI = P × r × (1+r)^n / ((1+r)^n − 1)`.
+- Phone numbers are validated as 10-digit Indian mobile numbers (`6-9` followed by 9 digits); emails are validated for standard format.
+- The EMI schedule uses the standard reducing-balance formula: `EMI = P × r × (1+r)^n / ((1+r)^n − 1)`. Since you now enter the desired EMI instead of a rate, the backend solves for the matching monthly rate using bisection search (there's no closed-form formula for this).
 - For production: put this behind HTTPS, move the JWT secret to a real secrets manager, and consider rate limiting and audit logging for payment records.

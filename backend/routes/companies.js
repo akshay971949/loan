@@ -1,9 +1,6 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const pool = require('../config/db');
-
-function isValidGmail(email) { return /^[A-Z0-9._%+-]+@gmail\.com$/i.test(String(email || '').trim()); }
-function isValidPhone(phone) { return /^\+?[0-9]{10,15}$/.test(String(phone || '').replace(/[\s-]/g, '')); }
 const { authenticate, requireRole } = require('../middleware/auth');
 const router = express.Router();
 
@@ -29,12 +26,10 @@ router.get('/', authenticate, requireRole('super_admin'), async (req, res) => {
 router.post('/', authenticate, requireRole('super_admin'), async (req, res) => {
   const conn = await pool.getConnection();
   try {
-    const { company_name, admin_name, admin_email, admin_password, admin_phone } = req.body;
-    if (!company_name || !admin_name || !admin_email || !admin_password || !admin_phone) {
+    const { company_name, admin_name, admin_email, admin_password } = req.body;
+    if (!company_name || !admin_name || !admin_email || !admin_password) {
       return res.status(400).json({ message: 'Company name, admin name, admin email and admin password are all required' });
     }
-    if (!isValidGmail(admin_email)) return res.status(400).json({ message: 'Only a valid Gmail address (@gmail.com) is allowed' });
-    if (!isValidPhone(admin_phone)) return res.status(400).json({ message: 'Enter a valid phone number' });
     if (admin_password.length < 6) {
       return res.status(400).json({ message: 'Admin password must be at least 6 characters' });
     }
@@ -51,8 +46,8 @@ router.post('/', authenticate, requireRole('super_admin'), async (req, res) => {
 
     const hash = await bcrypt.hash(admin_password, 10);
     await conn.query(
-      'INSERT INTO users (company_id, name, email, phone, password_hash, role) VALUES (?, ?, ?, ?, ?, ?)',
-      [companyId, admin_name, admin_email, admin_phone, hash, 'admin']
+      'INSERT INTO users (company_id, name, email, password_hash, role) VALUES (?, ?, ?, ?, ?)',
+      [companyId, admin_name, admin_email, hash, 'admin']
     );
 
     await conn.commit();
@@ -72,6 +67,27 @@ router.delete('/:id', authenticate, requireRole('super_admin'), async (req, res)
     res.json({ message: 'Company removed' });
   } catch (err) {
     res.status(500).json({ message: 'Failed to remove company', error: err.message });
+  }
+});
+
+// PUT /api/companies/:id/reset-admin-password - super admin resets a company's admin password
+router.put('/:id/reset-admin-password', authenticate, requireRole('super_admin'), async (req, res) => {
+  try {
+    const { new_password } = req.body;
+    if (!new_password || new_password.length < 6) {
+      return res.status(400).json({ message: 'New password must be at least 6 characters' });
+    }
+    const [existing] = await pool.query(
+      "SELECT id FROM users WHERE role = 'admin' AND company_id = ?",
+      [req.params.id]
+    );
+    if (!existing.length) return res.status(404).json({ message: 'No admin account found for this company' });
+
+    const hash = await bcrypt.hash(new_password, 10);
+    await pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [hash, existing[0].id]);
+    res.json({ message: 'Password reset successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to reset password', error: err.message });
   }
 });
 

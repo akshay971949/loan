@@ -17,13 +17,23 @@ function statusBadge(status) {
   return `<span class="badge badge-${status}">${status}</span>`;
 }
 
+let currentLoan = null;
+
 async function load() {
-  const { loan, emis } = await api(`/loans/${loanId}`);
+  const { loan, emis, editable } = await api(`/loans/${loanId}`);
+  currentLoan = loan;
 
   document.getElementById('loanTitle').textContent = `Loan #${loan.id} — ${loan.full_name}`;
   document.getElementById('loanSub').textContent = `${loan.loan_type} • ${loan.phone} • started ${formatDate(loan.start_date)}`;
   document.getElementById('statusSelect').value = loan.status;
-  if (user.role !== 'admin') document.getElementById('statusSelect').disabled = true;
+
+  if (user.role === 'admin') {
+    document.getElementById('deleteBtn').style.display = 'inline-block';
+    const editBtn = document.getElementById('editBtn');
+    editBtn.style.display = 'inline-block';
+    editBtn.disabled = !editable;
+    editBtn.title = editable ? '' : 'Cannot edit after payments have been recorded';
+  }
 
   const paid = emis.filter(e => e.status === 'paid').reduce((s, e) => s + Number(e.paid_amount), 0);
   const outstanding = Number(loan.principal_amount) + emis.reduce((s, e) => s + Number(e.interest_component), 0) - paid;
@@ -77,7 +87,6 @@ document.getElementById('payConfirm').addEventListener('click', async () => {
 });
 
 document.getElementById('statusSelect').addEventListener('change', async (e) => {
-  if (user.role !== 'admin') return;
   try {
     await api(`/loans/${loanId}/status`, { method: 'PUT', body: { status: e.target.value } });
   } catch (err) {
@@ -87,6 +96,54 @@ document.getElementById('statusSelect').addEventListener('change', async (e) => 
 
 document.getElementById('exportBtn').addEventListener('click', () => {
   downloadCsv(`/export/emis?loan_id=${loanId}`, `loan_${loanId}_schedule.csv`).catch(err => alert(err.message));
+});
+
+document.getElementById('editBtn').addEventListener('click', () => {
+  if (!currentLoan) return;
+  document.getElementById('editError').style.display = 'none';
+  document.getElementById('e_type').value = currentLoan.loan_type;
+  document.getElementById('e_principal').value = currentLoan.principal_amount;
+  document.getElementById('e_emi').value = currentLoan.emi_amount;
+  document.getElementById('e_tenure').value = currentLoan.tenure_months;
+  document.getElementById('e_start').value = currentLoan.start_date.slice(0, 10);
+  document.getElementById('editModal').classList.add('open');
+});
+document.getElementById('editCancel').addEventListener('click', () => {
+  document.getElementById('editModal').classList.remove('open');
+});
+document.getElementById('editSave').addEventListener('click', async () => {
+  const errorMsg = document.getElementById('editError');
+  errorMsg.style.display = 'none';
+  const body = {
+    loan_type: document.getElementById('e_type').value.trim() || 'Personal',
+    principal_amount: document.getElementById('e_principal').value,
+    emi_amount: document.getElementById('e_emi').value,
+    tenure_months: document.getElementById('e_tenure').value,
+    start_date: document.getElementById('e_start').value
+  };
+  if (!body.principal_amount || !body.emi_amount || !body.tenure_months || !body.start_date) {
+    errorMsg.textContent = 'All fields are required';
+    errorMsg.style.display = 'block';
+    return;
+  }
+  try {
+    await api(`/loans/${loanId}`, { method: 'PUT', body });
+    document.getElementById('editModal').classList.remove('open');
+    load();
+  } catch (err) {
+    errorMsg.textContent = err.message;
+    errorMsg.style.display = 'block';
+  }
+});
+
+document.getElementById('deleteBtn').addEventListener('click', async () => {
+  if (!confirm('Delete this loan and its entire EMI schedule? This cannot be undone.')) return;
+  try {
+    await api(`/loans/${loanId}`, { method: 'DELETE' });
+    window.location.href = 'loans.html';
+  } catch (err) {
+    alert(err.message);
+  }
 });
 
 load();

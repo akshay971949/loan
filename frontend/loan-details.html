@@ -39,6 +39,8 @@
           <option value="defaulted">Defaulted</option>
         </select>
         <button class="btn btn-ghost" id="exportBtn">Export schedule (CSV)</button>
+        <button class="btn btn-ghost" id="editBtn" style="display:none">Edit loan</button>
+        <button class="btn btn-ghost" id="deleteBtn" style="display:none;color:var(--bad)">Delete loan</button>
       </div>
     </div>
 
@@ -55,6 +57,28 @@
       </table>
     </div>
   </main>
+</div>
+
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <h3>Edit loan</h3>
+    <p class="sub" id="editModalSub">Recalculates the EMI schedule</p>
+    <div class="grid-2">
+      <div><label for="e_type">Loan type</label><input type="text" id="e_type"></div>
+      <div><label for="e_principal">Principal amount</label><input type="number" id="e_principal" step="0.01"></div>
+    </div>
+    <div class="grid-2">
+      <div><label for="e_emi">Monthly EMI amount (₹)</label><input type="number" id="e_emi" step="0.01"></div>
+      <div><label for="e_tenure">Tenure (months)</label><input type="number" id="e_tenure"></div>
+    </div>
+    <label for="e_start">Start date</label>
+    <input type="date" id="e_start">
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="editCancel">Cancel</button>
+      <button class="btn btn-primary" id="editSave">Save changes</button>
+    </div>
+    <p class="error-msg" id="editError"></p>
+  </div>
 </div>
 
 <div class="modal-overlay" id="payModal">

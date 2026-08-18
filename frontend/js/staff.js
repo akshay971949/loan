@@ -28,10 +28,43 @@ async function loadStaff() {
       <td>${s.email}</td>
       <td>${s.phone || '—'}</td>
       <td>${formatDate(s.created_at)}</td>
-      <td><button class="btn btn-ghost btn-sm" onclick="removeStaff(${s.id})">Remove</button></td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="openResetModal(${s.id}, '${s.name.replace(/'/g, "\\'")}')">Reset password</button>
+        <button class="btn btn-ghost btn-sm" onclick="removeStaff(${s.id})">Remove</button>
+      </td>
     </tr>
   `).join('');
 }
+
+let resetStaffId = null;
+function openResetModal(id, name) {
+  resetStaffId = id;
+  document.getElementById('resetModalSub').textContent = `Set a new password for ${name}`;
+  document.getElementById('r_password').value = '';
+  document.getElementById('resetError').style.display = 'none';
+  document.getElementById('resetModal').classList.add('open');
+}
+document.getElementById('resetCancel').addEventListener('click', () => {
+  document.getElementById('resetModal').classList.remove('open');
+});
+document.getElementById('resetConfirm').addEventListener('click', async () => {
+  const errorMsg = document.getElementById('resetError');
+  errorMsg.style.display = 'none';
+  const new_password = document.getElementById('r_password').value;
+  if (!new_password || new_password.length < 6) {
+    errorMsg.textContent = 'Password must be at least 6 characters';
+    errorMsg.style.display = 'block';
+    return;
+  }
+  try {
+    await api(`/staff/${resetStaffId}/reset-password`, { method: 'PUT', body: { new_password } });
+    document.getElementById('resetModal').classList.remove('open');
+    alert('Password reset. Share the new password with them directly.');
+  } catch (err) {
+    errorMsg.textContent = err.message;
+    errorMsg.style.display = 'block';
+  }
+});
 
 async function removeStaff(id) {
   if (!confirm('Remove this staff account? They will lose access immediately.')) return;

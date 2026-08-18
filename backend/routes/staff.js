@@ -3,8 +3,6 @@ const bcrypt = require('bcryptjs');
 const pool = require('../config/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const router = express.Router();
-function isValidGmail(email) { return /^[A-Z0-9._%+-]+@gmail\.com$/i.test(String(email || '').trim()); }
-function isValidPhone(phone) { return /^\+?[0-9]{10,15}$/.test(String(phone || '').replace(/[\s-]/g, '')); }
 
 // GET /api/staff - list staff within THIS admin's own company. Admin only.
 router.get('/', authenticate, requireRole('admin'), async (req, res) => {
@@ -23,11 +21,9 @@ router.get('/', authenticate, requireRole('admin'), async (req, res) => {
 router.post('/', authenticate, requireRole('admin'), async (req, res) => {
   try {
     const { name, email, password, phone } = req.body;
-    if (!name || !email || !password || !phone) {
-      return res.status(400).json({ message: 'Name, email, phone and password are required' });
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Name, email and password are required' });
     }
-    if (!isValidGmail(email)) return res.status(400).json({ message: 'Only a valid Gmail address (@gmail.com) is allowed' });
-    if (!isValidPhone(phone)) return res.status(400).json({ message: 'Enter a valid phone number' });
     if (password.length < 6) {
       return res.status(400).json({ message: 'Password must be at least 6 characters' });
     }
@@ -61,6 +57,27 @@ router.delete('/:id', authenticate, requireRole('admin'), async (req, res) => {
     res.json({ message: 'Staff account removed' });
   } catch (err) {
     res.status(500).json({ message: 'Failed to remove staff account', error: err.message });
+  }
+});
+
+// PUT /api/staff/:id/reset-password - admin resets a staff member's password (their own company only)
+router.put('/:id/reset-password', authenticate, requireRole('admin'), async (req, res) => {
+  try {
+    const { new_password } = req.body;
+    if (!new_password || new_password.length < 6) {
+      return res.status(400).json({ message: 'New password must be at least 6 characters' });
+    }
+    const [existing] = await pool.query(
+      "SELECT id FROM users WHERE id = ? AND role = 'staff' AND company_id = ?",
+      [req.params.id, req.user.company_id]
+    );
+    if (!existing.length) return res.status(404).json({ message: 'Staff account not found in your company' });
+
+    const hash = await bcrypt.hash(new_password, 10);
+    await pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [hash, req.params.id]);
+    res.json({ message: 'Password reset successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to reset password', error: err.message });
   }
 });
 

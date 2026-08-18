@@ -1,7 +1,7 @@
-const user = guardPage(); // no specific role required — works for admin or customer
+const user = guardPage(); // no specific role required — works for any signed-in user
 const backLink = document.getElementById('backLink');
 if (user) {
-  const dest = user.role === 'super_admin' ? 'companies.html' : (user.role === 'admin' || user.role === 'staff' ? 'dashboard.html' : 'customer-portal.html');
+  const dest = user.role === 'super_admin' ? 'companies.html' : 'dashboard.html';
   backLink.innerHTML = `<a href="${dest}">← Back to dashboard</a>`;
 }
 

@@ -30,10 +30,43 @@ async function loadCompanies() {
       <td>${c.staff_count}</td>
       <td>${c.customer_count}</td>
       <td>${formatDate(c.created_at)}</td>
-      <td><button class="btn btn-ghost btn-sm" onclick="removeCompany(${c.id})">Remove</button></td>
+      <td>
+        <button class="btn btn-ghost btn-sm" onclick="openResetModal(${c.id}, '${(c.admin_name || 'this admin').replace(/'/g, "\\'")}')">Reset admin password</button>
+        <button class="btn btn-ghost btn-sm" onclick="removeCompany(${c.id})">Remove</button>
+      </td>
     </tr>
   `).join('');
 }
+
+let resetCompanyId = null;
+function openResetModal(id, adminName) {
+  resetCompanyId = id;
+  document.getElementById('resetModalSub').textContent = `Set a new password for ${adminName}`;
+  document.getElementById('r_password').value = '';
+  document.getElementById('resetError').style.display = 'none';
+  document.getElementById('resetModal').classList.add('open');
+}
+document.getElementById('resetCancel').addEventListener('click', () => {
+  document.getElementById('resetModal').classList.remove('open');
+});
+document.getElementById('resetConfirm').addEventListener('click', async () => {
+  const errorMsg = document.getElementById('resetError');
+  errorMsg.style.display = 'none';
+  const new_password = document.getElementById('r_password').value;
+  if (!new_password || new_password.length < 6) {
+    errorMsg.textContent = 'Password must be at least 6 characters';
+    errorMsg.style.display = 'block';
+    return;
+  }
+  try {
+    await api(`/companies/${resetCompanyId}/reset-admin-password`, { method: 'PUT', body: { new_password } });
+    document.getElementById('resetModal').classList.remove('open');
+    alert('Password reset. Share the new password with them directly.');
+  } catch (err) {
+    errorMsg.textContent = err.message;
+    errorMsg.style.display = 'block';
+  }
+});
 
 async function removeCompany(id) {
   if (!confirm('Remove this company? This deletes its admin, staff, customers, loans and EMI records — permanently.')) return;
@@ -47,7 +80,7 @@ async function removeCompany(id) {
 
 document.getElementById('addBtn').addEventListener('click', () => {
   document.getElementById('companyError').style.display = 'none';
-  ['c_name','c_admin_name','c_admin_email','c_admin_phone','c_admin_password'].forEach(id => document.getElementById(id).value = '');
+  ['c_name','c_admin_name','c_admin_email','c_admin_password'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('companyModal').classList.add('open');
 });
 document.getElementById('companyCancel').addEventListener('click', () => {
@@ -61,11 +94,10 @@ document.getElementById('companySave').addEventListener('click', async () => {
     company_name: document.getElementById('c_name').value.trim(),
     admin_name: document.getElementById('c_admin_name').value.trim(),
     admin_email: document.getElementById('c_admin_email').value.trim(),
-    admin_phone: document.getElementById('c_admin_phone').value.trim(),
     admin_password: document.getElementById('c_admin_password').value
   };
-  if (!body.company_name || !body.admin_name || !body.admin_email || !body.admin_phone || !body.admin_password) {
-    errorMsg.textContent = 'All fields are required (including Gmail and phone)';
+  if (!body.company_name || !body.admin_name || !body.admin_email || !body.admin_password) {
+    errorMsg.textContent = 'All fields are required';
     errorMsg.style.display = 'block';
     return;
   }

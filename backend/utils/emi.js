@@ -53,4 +53,22 @@ function generateSchedule(principal, monthlyRatePercent, tenureMonths, startDate
   return { emi, schedule };
 }
 
-module.exports = { calculateEMI, generateSchedule };
+// Given principal, a target EMI amount, and tenure, solves for the monthly interest
+// rate (as a percent) that would produce that EMI. There's no closed-form formula for
+// this, so it uses bisection search (the EMI is a strictly increasing function of rate).
+function solveMonthlyRate(principal, emiAmount, tenureMonths) {
+  const flatEmi = principal / tenureMonths;
+  if (emiAmount <= flatEmi) {
+    return 0; // EMI too low to carry any interest — treat as 0%
+  }
+
+  let low = 0, high = 100; // percent; 100%/month is a very generous upper bound
+  for (let i = 0; i < 100; i++) {
+    const mid = (low + high) / 2;
+    const emiAtMid = calculateEMI(principal, mid, tenureMonths);
+    if (emiAtMid > emiAmount) high = mid; else low = mid;
+  }
+  return +((low + high) / 2).toFixed(4);
+}
+
+module.exports = { calculateEMI, generateSchedule, solveMonthlyRate };

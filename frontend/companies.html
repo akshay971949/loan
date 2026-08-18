@@ -55,10 +55,8 @@
     <input type="text" id="c_name">
     <label for="c_admin_name">Admin's full name</label>
     <input type="text" id="c_admin_name">
-    <label for="c_admin_email">Admin's Gmail</label>
-    <input type="email" id="c_admin_email" placeholder="admin@gmail.com">
-    <label for="c_admin_phone">Admin's phone</label>
-    <input type="text" id="c_admin_phone" placeholder="10-digit phone number">
+    <label for="c_admin_email">Admin's email</label>
+    <input type="email" id="c_admin_email">
     <label for="c_admin_password">Admin's password</label>
     <input type="password" id="c_admin_password" placeholder="At least 6 characters">
     <div class="modal-actions">
@@ -66,6 +64,20 @@
       <button class="btn btn-primary" id="companySave">Create company</button>
     </div>
     <p class="error-msg" id="companyError"></p>
+  </div>
+</div>
+
+<div class="modal-overlay" id="resetModal">
+  <div class="modal">
+    <h3>Reset admin password</h3>
+    <p class="sub" id="resetModalSub"></p>
+    <label for="r_password">New password</label>
+    <input type="password" id="r_password" placeholder="At least 6 characters">
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="resetCancel">Cancel</button>
+      <button class="btn btn-primary" id="resetConfirm">Reset password</button>
+    </div>
+    <p class="error-msg" id="resetError"></p>
   </div>
 </div>
 
